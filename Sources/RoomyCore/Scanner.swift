@@ -6,6 +6,10 @@ public struct ScanOptions: Sendable {
     public var now = Date()
     public var staleProjectDays = 30
     public var appCacheMinBytes: Int64 = 50_000_000
+    /// App caches this big may hold real data (models, media), so they start unselected.
+    public var appCacheReviewBytes: Int64 = 1_000_000_000
+    /// Mark items that something else still reaches through a symlink.
+    public var checkLinks = true
     public var installerMinDays = 7
     public var largeFileMinBytes: Int64 = 1_000_000_000
     public var largeFileUnusedDays = 90
@@ -27,7 +31,12 @@ public enum Scanner {
         progress: @escaping @Sendable (String) -> Void = { _ in }
     ) async -> ScanResult {
         let start = Date()
-        let categories = await withTaskGroup(of: ScanCategory.self) { group in
+        // The link walk takes a few seconds, so it runs alongside the category scans.
+        let wantsLinks = options.checkLinks && options.categories.contains { $0.action == .moveToTrash }
+        let links: Task<LinkIndex, Never>? = wantsLinks
+            ? Task.detached { LinkIndex.build(home: options.home) } : nil
+
+        var categories = await withTaskGroup(of: ScanCategory.self) { group in
             for id in options.categories {
                 group.addTask {
                     progress("\(id.title) 확인 중…")
@@ -39,6 +48,19 @@ public enum Scanner {
             var all: [ScanCategory] = []
             for await c in group where !c.findings.isEmpty { all.append(c) }
             return all
+        }
+        if let links {
+            progress("링크 확인 중…")
+            let index = await links.value
+            categories = categories.map { c in
+                guard c.id.action == .moveToTrash else { return c }
+                return ScanCategory(id: c.id, findings: c.findings.map { f in
+                    guard let l = index.incomingLink(into: f.url) else { return f }
+                    var marked = f
+                    marked.caution = "다른 곳에서 링크로 쓰는 중이에요: \(l.link)"
+                    return marked
+                })
+            }
         }
         let order = CategoryID.allCases
         return ScanResult(
@@ -108,7 +130,10 @@ enum Rules {
             let name = url.lastPathComponent
             guard !covered.contains(name), name != ownID else { return nil }
             let size = FileSystem.allocatedSize(url)
-            return size >= o.appCacheMinBytes ? Finding(url: url, bytes: size, note: name) : nil
+            guard size >= o.appCacheMinBytes else { return nil }
+            let caution = size >= o.appCacheReviewBytes
+                ? "\(o.appCacheReviewBytes.formattedBytes)가 넘는 캐시예요. 앱이 실제 데이터를 넣어 뒀을 수 있어요." : nil
+            return Finding(url: url, bytes: size, note: name, caution: caution)
         }
     }
 

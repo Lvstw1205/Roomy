@@ -1,18 +1,19 @@
 import Foundation
 
 enum Shell {
-    /// Runs a tool and returns stdout. Throws on a non-zero exit.
-    static func run(_ executable: String, _ arguments: [String]) throws -> String {
+    /// Runs a tool and returns stdout. Throws on a non-zero exit unless `allowFailure`
+    /// (e.g. `find` exits 1 when some folders are unreadable but still prints the rest).
+    static func run(_ executable: String, _ arguments: [String], allowFailure: Bool = false) throws -> String {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: executable)
         p.arguments = arguments
         let out = Pipe()
         p.standardOutput = out
-        p.standardError = Pipe()
+        p.standardError = FileHandle.nullDevice
         try p.run()
         let data = out.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
-        guard p.terminationStatus == 0 else {
+        guard p.terminationStatus == 0 || allowFailure else {
             throw RoomyError.system("\(URL(fileURLWithPath: executable).lastPathComponent) 실패 (\(p.terminationStatus))")
         }
         return String(decoding: data, as: UTF8.self)

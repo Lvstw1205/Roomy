@@ -107,14 +107,19 @@ public struct Finding: Identifiable, Hashable, Sendable, Codable {
     public let original: URL?
     /// Simulators: the device UDID.
     public let token: String?
+    /// Why this item should be looked at before cleaning. Items with a caution
+    /// start unselected even in a safe category.
+    public var caution: String?
 
-    public init(url: URL, bytes: Int64, note: String = "", original: URL? = nil, token: String? = nil) {
+    public init(url: URL, bytes: Int64, note: String = "", original: URL? = nil, token: String? = nil,
+                caution: String? = nil) {
         self.id = UUID()
         self.url = url
         self.bytes = bytes
         self.note = note
         self.original = original
         self.token = token
+        self.caution = caution
     }
 }
 
@@ -141,6 +146,7 @@ public struct ScanResult: Sendable {
 public enum RoomyError: LocalizedError {
     case unsafePath(String)
     case missing(String)
+    case linked(String)
     case changedSinceScan
     case notWorthIt
     case system(String)
@@ -149,6 +155,7 @@ public enum RoomyError: LocalizedError {
         switch self {
         case .unsafePath(let p): "보호된 위치라서 건너뛰었어요: \(p)"
         case .missing(let p): "파일이 이미 없어요: \(p)"
+        case .linked(let link): "다른 곳에서 링크로 쓰는 중이라 건너뛰었어요: \(link)"
         case .changedSinceScan: "스캔 후에 파일이 바뀌어서 건너뛰었어요."
         case .notWorthIt: "압축해도 10% 이상 줄지 않아서 원본을 그대로 뒀어요."
         case .system(let m): m

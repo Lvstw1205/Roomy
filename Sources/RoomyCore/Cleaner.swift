@@ -41,10 +41,20 @@ public enum Cleaner {
             .sorted { order.firstIndex(of: $0.id)! < order.firstIndex(of: $1.id)! }
             .flatMap { c in c.findings.map { (c.id, $0) } }
 
+        // Checked again here, not only at scan time: links may have appeared since.
+        var links: LinkIndex?
+        if work.contains(where: { $0.0.action == .moveToTrash }) {
+            progress(0, work.count, "링크 확인 중…")
+            links = LinkIndex.build(home: home)
+        }
+
         var outcomes: [ItemOutcome] = []
         for (index, (category, finding)) in work.enumerated() {
             progress(index, work.count, finding.url.lastPathComponent)
             do {
+                if category.action == .moveToTrash, let l = links?.incomingLink(into: finding.url) {
+                    throw RoomyError.linked(l.link)
+                }
                 let bytes = try await clean(finding, as: category, home: home, trasher: trasher)
                 outcomes.append(ItemOutcome(category: category, finding: finding, bytes: bytes, error: nil))
             } catch {

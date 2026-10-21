@@ -41,6 +41,8 @@ final class AppModel {
             }.value
             categories = result.categories
             enabled = Set(result.categories.map(\.id).filter(\.enabledByDefault))
+            // Flagged items start unticked; the user opts in after reading why.
+            excluded = Set(result.categories.flatMap(\.findings).filter { $0.caution != nil }.map(\.id))
             disk = result.disk
             scanSeconds = result.duration
             phase = .results

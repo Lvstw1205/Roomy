@@ -204,3 +204,61 @@ struct VideoTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: home.trash.path).count == 1)
     }
 }
+
+/// Regression: an app moved model files into ~/Library/Caches/AIRI and linked them back
+/// from its model store. Trashing that "cache" broke the model.
+@Suite struct LinkedCacheTests {
+    func makeLinkedCache(_ home: FakeHome) throws -> URL {
+        let blob = try home.file("Library/Caches/AIRI/gemma/sha256-abc")
+        let store = home.url.appendingPathComponent("models/blobs")
+        try FileManager.default.createDirectory(at: store, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: store.appendingPathComponent("sha256-abc"), withDestinationURL: blob)
+        return blob
+    }
+
+    @Test func scanFlagsCacheThatIsLinkedFromElsewhere() async throws {
+        let home = try FakeHome()
+        try makeLinkedCache(home)
+        var o = home.options([.appCaches])
+        o.appCacheMinBytes = 1
+        let finding = try #require(await Scanner.scan(o).categories.first?.findings.first)
+        #expect(finding.url.lastPathComponent == "AIRI")
+        #expect(finding.caution?.contains("models/blobs/sha256-abc") == true)
+    }
+
+    @Test func cleanerRefusesLinkedCacheEvenIfSelected() async throws {
+        let home = try FakeHome()
+        let blob = try makeLinkedCache(home)
+        let cache = home.url.appendingPathComponent("Library/Caches/AIRI")
+        let plan = [ScanCategory(id: .appCaches, findings: [Finding(url: cache, bytes: 2_000_000)])]
+        let report = await Cleaner.run(plan, home: home.url, trasher: home.trasher)
+        #expect(report.failures.count == 1)
+        #expect(report.failures.first?.error?.contains("링크") == true)
+        #expect(FileManager.default.fileExists(atPath: blob.path))
+    }
+
+    @Test func linksInsideTheCacheItselfDoNotBlock() async throws {
+        let home = try FakeHome()
+        let download = try home.file("Library/Caches/Tool/downloads/pkg.tar")
+        try FileManager.default.createSymbolicLink(
+            at: home.url.appendingPathComponent("Library/Caches/Tool/pkg"), withDestinationURL: download)
+        var o = home.options([.appCaches])
+        o.appCacheMinBytes = 1
+        let scan = await Scanner.scan(o)
+        #expect(scan.categories.first?.findings.first?.caution == nil)
+        let report = await Cleaner.run(scan.categories, home: home.url, trasher: home.trasher)
+        #expect(report.failures.isEmpty)
+    }
+
+    @Test func largeAppCachesStartFlagged() async throws {
+        let home = try FakeHome()
+        try home.file("Library/Caches/Big/data", bytes: 3_000_000)
+        try home.file("Library/Caches/Small/data", bytes: 300_000)
+        var o = home.options([.appCaches])
+        o.appCacheMinBytes = 100_000
+        o.appCacheReviewBytes = 1_000_000
+        let findings = await Scanner.scan(o).categories.first?.findings ?? []
+        let flagged = Dictionary(uniqueKeysWithValues: findings.map { ($0.url.lastPathComponent, $0.caution != nil) })
+        #expect(flagged == ["Big": true, "Small": false])
+    }
+}

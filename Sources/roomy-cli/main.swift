@@ -31,6 +31,7 @@ for c in result.categories {
     for f in c.findings.prefix(5) {
         let path = f.url.path.hasPrefix(home) ? "~" + f.url.path.dropFirst(home.count) : f.url.path
         print("    \(f.bytes.formattedBytes.padding(toLength: 10, withPad: " ", startingAt: 0)) \(path)")
+        if let caution = f.caution { print("               ⚠︎ \(caution)") }
     }
     if c.findings.count > 5 { print("    … 외 \(c.findings.count - 5)개") }
 }

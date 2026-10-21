@@ -174,6 +174,7 @@ struct CategoryCard: View {
     @State private var expanded = false
 
     var isOn: Bool { model.enabled.contains(category.id) }
+    var cautionCount: Int { category.findings.filter { $0.caution != nil }.count }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -193,6 +194,10 @@ struct CategoryCard: View {
                     Text(category.id.explanation)
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if cautionCount > 0 {
+                        Label("\(cautionCount)개는 확인이 필요해서 선택을 빼뒀어요", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
                 }
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 2) {
@@ -247,6 +252,10 @@ struct FindingRow: View {
                 Text(finding.url.lastPathComponent).lineLimit(1)
                 Text(finding.note.isEmpty ? finding.url.shortPath : "\(finding.note) · \(finding.url.shortPath)")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                if let caution = finding.caution {
+                    Label(caution, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange).lineLimit(2).truncationMode(.middle)
+                }
             }
             Spacer()
             Text(finding.bytes.formattedBytes).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
