@@ -77,6 +77,15 @@ To add a category: add a case to `CategoryID` (`Models.swift`), return findings 
 swift test
 ```
 
+### Releasing
+
+```bash
+scripts/release.sh 0.1.2 --prerelease    # tests, builds, zips, publishes
+DRY_RUN=1 scripts/release.sh 0.1.2       # same, but publishes nothing
+```
+
+The script refuses to run with uncommitted changes or when `main` is not pushed, so every release matches the code on GitHub.
+
 ## Roadmap
 
 - APFS transparent compression for rarely used apps and documents
