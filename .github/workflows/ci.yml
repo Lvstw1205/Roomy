@@ -9,14 +9,14 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build
         run: swift build
       - name: Test
         run: swift test
       - name: Build app bundle
         run: scripts/build-app.sh "0.0.0-${GITHUB_SHA::7}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Roomy.app
           path: dist/Roomy.app
