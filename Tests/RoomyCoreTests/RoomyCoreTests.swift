@@ -262,3 +262,29 @@ struct VideoTests {
         #expect(flagged == ["Big": true, "Small": false])
     }
 }
+
+@Suite struct ModelFileTests {
+    @Test func largeOldFilesNeverIncludeModelWeights() async throws {
+        let home = try FakeHome()
+        try home.file("Documents/llama-3-8b.Q4_K_M.gguf")
+        try home.file("Downloads/sd-xl.safetensors")
+        try home.file("Downloads/old-backup.zip")
+        var o = home.options([.largeOldFiles])
+        o.largeFileMinBytes = 1_000_000
+        o.largeFileUnusedDays = 0
+        let names = await Scanner.scan(o).categories.first?.findings.map(\.url.lastPathComponent)
+        #expect(names == ["old-backup.zip"])
+    }
+
+    @Test func appCacheHoldingModelsIsFlagged() async throws {
+        let home = try FakeHome()
+        try home.file("Library/Caches/VoiceApp/models/whisper.safetensors")
+        try home.file("Library/Caches/Browser/data")
+        var o = home.options([.appCaches])
+        o.appCacheMinBytes = 1
+        let findings = await Scanner.scan(o).categories.first?.findings ?? []
+        let cautions = Dictionary(uniqueKeysWithValues: findings.map { ($0.url.lastPathComponent, $0.caution) })
+        #expect(cautions["VoiceApp"]??.contains("AI 모델") == true)
+        #expect(cautions["Browser"] == .some(nil))
+    }
+}

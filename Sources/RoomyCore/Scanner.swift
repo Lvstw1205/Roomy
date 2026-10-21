@@ -131,8 +131,11 @@ enum Rules {
             guard !covered.contains(name), name != ownID else { return nil }
             let size = FileSystem.allocatedSize(url)
             guard size >= o.appCacheMinBytes else { return nil }
-            let caution = size >= o.appCacheReviewBytes
-                ? "\(o.appCacheReviewBytes.formattedBytes)가 넘는 캐시예요. 앱이 실제 데이터를 넣어 뒀을 수 있어요." : nil
+            let caution: String? = if containsModelFile(url) {
+                "AI 모델 파일이 들어 있어요. 앱이 모델을 캐시 폴더에 저장한 것일 수 있어요."
+            } else if size >= o.appCacheReviewBytes {
+                "\(o.appCacheReviewBytes.formattedBytes)가 넘는 캐시예요. 앱이 실제 데이터를 넣어 뒀을 수 있어요."
+            } else { nil }
             return Finding(url: url, bytes: size, note: name, caution: caution)
         }
     }
@@ -231,6 +234,24 @@ enum Rules {
 
     static let installerExtensions: Set = ["dmg", "pkg", "mpkg", "iso", "xip"]
 
+    /// AI model weights. Roomy never selects these for the Trash.
+    static let modelExtensions: Set = ["gguf", "ggml", "safetensors", "ckpt", "pt", "pth", "onnx", "mlmodel"]
+
+    /// Model weights, including Ollama-style content-addressed blobs (`sha256-…`, no extension).
+    static func isModelFile(_ url: URL, size: Int64) -> Bool {
+        modelExtensions.contains(url.pathExtension.lowercased())
+            || (url.lastPathComponent.hasPrefix("sha256-") && size >= 100_000_000)
+    }
+
+    /// True when a folder holds model weights, e.g. an app that keeps its models in its cache.
+    static func containsModelFile(_ folder: URL) -> Bool {
+        var found = false
+        FileSystem.regularFiles(under: [folder], keys: [.totalFileAllocatedSizeKey]) { url, v in
+            if !found, isModelFile(url, size: Int64(v.totalFileAllocatedSize ?? 0)) { found = true }
+        }
+        return found
+    }
+
     static func installers(_ o: ScanOptions) -> [Finding] {
         var found: [Finding] = []
         FileSystem.regularFiles(
@@ -255,7 +276,8 @@ enum Rules {
         ) { url, v in
             let size = Int64(v.totalFileAllocatedSize ?? 0)
             guard size >= o.largeFileMinBytes,
-                  !installerExtensions.contains(url.pathExtension.lowercased()) else { return }
+                  !installerExtensions.contains(url.pathExtension.lowercased()),
+                  !isModelFile(url, size: size) else { return }
             let lastUsed = [v.contentAccessDate, v.contentModificationDate].compactMap { $0 }.max()
             let idle = FileSystem.days(since: lastUsed, now: o.now)
             guard idle >= o.largeFileUnusedDays else { return }

@@ -2,12 +2,21 @@
 
 # Roomy
 
-**One button to find and reclaim disk space on a small-SSD Mac.**
-Built for developers and video creators on 256 GB machines.
+**Make room for local AI on your Mac.**
 
-Roomy is a native SwiftUI app (under 1 MB). Press **Scan**, review what it found,
-press **Clean all**, and get a report. Scanning never changes anything, and cleaning
-moves items to the Trash, so you can put anything back.
+One local LLM can take 4–40 GB, and every model you try adds more. Roomy finds that
+space in what you don't need: developer caches, stale dependencies, duplicate files and
+leftover installers. It leaves your models alone.
+
+Press **Scan**, review what it found, press **Clean all**, and get a report. Roomy is a
+native SwiftUI app under 1 MB. Scanning never changes anything, and cleaning moves items
+to the Trash, so you can put anything back.
+
+### Built not to break your AI setup
+- **Model folders are never scanned.** `~/.ollama`, `~/.cache/huggingface` and LM Studio's folder are not touched.
+- **Model files are left out.** `.gguf`, `.safetensors`, `.ckpt`, `.pt`, `.onnx` and Ollama blobs are excluded from the large-file cleanup. Duplicate copies of a model are merged as APFS clones, never deleted.
+- **Caches that hold models are flagged.** When an app keeps model weights in its cache folder, Roomy leaves that cache unticked and says why.
+- **Links are respected.** Model stores that link into another folder, for example from an external SSD, keep that folder safe.
 
 [한국어 안내는 아래에 있어요](#한국어)
 
@@ -106,7 +115,9 @@ MIT
 
 ## 한국어
 
-**256GB 맥 공간을 버튼 하나로 정리하는 앱이에요.** 개발자와 영상 작업자를 위해 만들었어요.
+**맥에서 로컬 AI를 돌릴 공간을 만들어줘요.**
+
+로컬 LLM 모델 하나가 4~40GB를 차지해요. Roomy는 그 공간을 필요 없는 곳에서 찾아줘요: 개발 캐시, 오래된 의존성, 중복 파일, 남은 설치 파일 등이에요. 모델 파일(`.gguf`, `.safetensors`, Ollama 모델 등)은 건드리지 않아요.
 
 1. **스캔**을 누르면 개발 캐시, 앱 캐시, 오래된 `node_modules`, 중복 파일 등을 찾아요. 이 단계에서는 아무것도 바꾸지 않아요.
 2. 목록을 확인하고 **한 번에 정리**를 누르면 선택한 항목을 휴지통으로 옮겨요.
